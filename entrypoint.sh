@@ -6,13 +6,14 @@ set -e
 #  Variable declarations
 #
 #=============================================================================
-SVER="20210310"         #-- Updated by Eugene Taylashev
+SVER="20210314"         #-- Updated by Eugene Taylashev
 
 #-- External variables by docker run
-#VERBOSE=1              #-- 1 - be verbose flag, defined outside of the script
-#POSTGRES_USER="postgres"
-#POSTGRES_PASSWORD=""  #-- if empty for new installation - will be generated randomly
-#POSTGRES_DB="postgres"
+#VERBOSE=1              	#-- 1 - be verbose flag, defined outside of the script
+#POSTGRES_ROOT_PASSWORD=""  #-- optional password for user postgres
+#POSTGRES_DB=""				#-- additional DB
+#POSTGRES_USER=""			#-- additional user with superuser power
+#POSTGRES_PASSWORD=""		#-- password for the user POSTGRES_USER
 
 USR="postgres"
 DIR_RUN="/run/postgresql"
@@ -142,39 +143,63 @@ local   all             all                                     md5
 host    all             all             0.0.0.0/0               md5
 EOC
 
+	POSTGRES_DB=${POSTGRES_DB:-""}
+	POSTGRES_USER=${POSTGRES_USER:-""}
+	POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-""}
+
+    TFILE=`mktemp`
+    if [ ! -f "$TFILE" ]; then
+        return 1
+    fi
+	chmod 644 $TFILE
+
     #-- start the server for additional configuration
     eval su-exec $USR pg_ctl -D $DIR_DB -w start
 
-    #-- create a user, not 
-    if [ "z$POSTGRES_USER" != "z" -a "$POSTGRES_USER" != "$USR" ] ; then
-        eval su-exec $USR createuser --createdb --login \
-             --createrole --superuser --inherit "$POSTGRES_USER" \
-             --no-password;
-        dlog "[ok] - created a user $POSTGRES_USER with supervisor permission"
-
-		#-- create a DB
-		if [ "z$POSTGRES_DB" != "z" ] ; then
-			eval su-exec $USR createdb $POSTGRES_DB --owner="$POSTGRES_USER" --no-password
-			dlog "[ok] - created a DB $POSTGRES_DB with right permission"
-		else 
-			dlog "[not ok] - user $POSTGRES_USER has no directory to access"
-		fi
-
-		#-- create a password for the user
-		if [ "z$POSTGRES_PASSWORD" != "z" ] ; then
-			TMP=./temp1.sql
-			echo "ALTER USER $POSTGRES_USER WITH PASSWORD '$POSTGRES_PASSWORD';" >$TMP
-			eval su-exec $USR psql -f $TMP
-			rm $TMP
-			dlog "[ok] - assigned the specified password to user $POSTGRES_USER"
-		else
-			dlog "[not ok] - user $POSTGRES_USER has no password assigned"
-		fi
-
-    else 
-		dlog "[ok] - no user was specified. Use local $USR"
+	#-- create a DB if specified
+	if [ "z$POSTGRES_DB" != "z" -a "$POSTGRES_DB" != "postgres" ] ; then
+		eval su-exec $USR createdb $POSTGRES_DB --no-password
+		dlog "[ok] - created a DB '$POSTGRES_DB' with right permission"
 	fi
 
+    #-- create a user if specified
+    if [ "z$POSTGRES_USER" != "z" -a "$POSTGRES_USER" != "$USR" ] ; then
+        eval su-exec $USR createuser  --login \
+             --createrole --superuser --inherit "$POSTGRES_USER" \
+             --no-password;
+        dlog "[ok] - created a user '$POSTGRES_USER' with supervisor permission"
+
+		#-- create a password for the user
+		if [ "$POSTGRES_PASSWORD" != "" ] ; then
+			echo "ALTER USER \"$POSTGRES_USER\" WITH PASSWORD '$POSTGRES_PASSWORD';" >>$TFILE
+			dlog "[ok] - assigned the specified password to user '$POSTGRES_USER'"
+		else
+			dlog "[not ok] - user '$POSTGRES_USER' has no password assigned"
+		fi
+
+		#-- Grant access to the specified DB
+		if [ "z$POSTGRES_DB" != "z" -a "$POSTGRES_DB" != "postgres" ] ; then
+			echo "REVOKE ALL ON DATABASE \"$POSTGRES_DB\" FROM public;" >>$TFILE
+			echo "GRANT CONNECT ON DATABASE \"$POSTGRES_DB\" TO \"$POSTGRES_USER\";" >>$TFILE
+			echo "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"$POSTGRES_USER\";" >>$TFILE
+			echo "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO \"$POSTGRES_USER\";" >>$TFILE
+			dlog "[ok] - grant access to '$POSTGRES_DB' TO '$POSTGRES_USER'"
+		fi
+    else 
+		dlog "[ok] - no additional user was specified. Use local $USR"
+	fi
+
+	#-- create a password for the superuser $USR
+	if [ "z$POSTGRES_ROOT_PASSWORD" != "z" ] ; then
+		echo "ALTER USER \"$USR\" WITH PASSWORD '$POSTGRES_ROOT_PASSWORD';" >>$TFILE
+		dlog "[ok] - assigned the specified password to user $USR"
+	else
+		dlog "[not ok] - user $POSTGRES_USER has no password assigned"
+	fi
+
+	#-- run SQL commands from file $TFILE
+	eval su-exec $USR psql -f $TFILE
+	rm -f $TFILE
 
     #-- stop the temporary server
     eval su-exec $USR pg_ctl -D $DIR_DB -w stop

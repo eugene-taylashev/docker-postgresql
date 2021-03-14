@@ -8,15 +8,17 @@ ENV VERBOSE=0
 ENV DIR_DATA=/var/lib/postgresql
 
 #-- Run parameters
-ENV POSTGRES_USER="postgres"
-ENV POSTGRES_PASSWORD=""  
-ENV POSTGRES_DB="postgres"
+#ENV VERBOSE=1              	#-- 1 - be verbose flag, defined outside of the script
+#ENV POSTGRES_ROOT_PASSWORD=""  #-- optional password for the superuser postgres
+#ENV POSTGRES_DB=""				#-- additional DB
+#ENV POSTGRES_USER=""			#-- additional user with superuser power
+#ENV POSTGRES_PASSWORD=""		#-- password for the user POSTGRES_USER
 
 LABEL maintainer="Eugene Taylashev" \
     architecture="amd64/x86_64" \
     postgresql-version="13.2" \
     alpine-version="3.13.2" \
-    build="2021-03-11" \
+    build="2021-03-14" \
     org.opencontainers.image.title="alpine-postgresql" \
     org.opencontainers.image.description="Minimal PostgreSQL image based on Alpine Linux" \
     org.opencontainers.image.authors="Eugene Taylashev" \
