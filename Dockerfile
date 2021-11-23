@@ -10,19 +10,18 @@ ENV DIR_DATA=/var/lib/postgresql
 #-- Run parameters
 #ENV VERBOSE=1              	#-- 1 - be verbose flag, defined outside of the script
 #ENV POSTGRES_ROOT_PASSWORD=""  #-- optional password for the superuser postgres
-#ENV POSTGRES_DB=""				#-- additional DB
-#ENV POSTGRES_USER=""			#-- additional user with superuser power
-#ENV POSTGRES_PASSWORD=""		#-- password for the user POSTGRES_USER
+#ENV POSTGRES_DB=""		#-- additional DB
+#ENV POSTGRES_USER=""		#-- additional user with superuser power
+#ENV POSTGRES_PASSWORD=""	#-- password for the user POSTGRES_USER
 
 LABEL maintainer="Eugene Taylashev" \
-    architecture="amd64/x86_64" \
-    postgresql-version="13.2" \
-    alpine-version="3.13.2" \
-    build="2021-03-14" \
+    postgresql-version="13.5" \
+    alpine-version="3.14.2" \
+    build="2021-11-22" \
     org.opencontainers.image.title="alpine-postgresql" \
     org.opencontainers.image.description="Minimal PostgreSQL image based on Alpine Linux" \
     org.opencontainers.image.authors="Eugene Taylashev" \
-    org.opencontainers.image.version="v13.2" \
+    org.opencontainers.image.version="v13.5" \
     org.opencontainers.image.url="https://hub.docker.com/r/etaylashev/postgresql" \
     org.opencontainers.image.source="https://github.com/eugene-taylashev/docker-postgresql" \
     org.opencontainers.image.created=$BUILD_DATE
@@ -59,7 +58,7 @@ RUN set -eux; \
     echo "America/Toronto" >  /etc/timezone; \
     apk del tzdata;
 
-COPY ./entrypoint.sh /
+COPY ./entrypoint.sh ./functions.sh /
 
 EXPOSE 5432
 STOPSIGNAL SIGINT
